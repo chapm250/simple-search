@@ -1,0 +1,227 @@
+---
+title: "Knapsack Hill-climb experiment write-up"
+author: "Josh Chapman & Henry Megarry"
+date: "February 21, 2016"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+#Introduction
+In our experiments we were running four different methods: regular Hill-climb, Hill-climb with random restarts, Hill-climb with random restarts & penalized scoreing, and random search. We have also tried changing up how many different items we tweak each iteration of the algorithm. Our algorithm uses an sequence to determine which items are being included, indicated with either a 0 or a 1. Our tweak function changes a random spot in that squence to either a 0 or a 1 randomly. This means that we only on average flip that number half the time. The first half of this report we tweaked 10 spots(on average 5) and the second half we tweaked 5 (on average 2.5). 
+
+#Experimental problems
+We applied our algorithm to the following knapsack problems:
+
+* `knapPI_11_20_1000_4`
+* `knapPI_13_20_1000_4` 
+* `knapPI_16_20_1000_4`
+* `knapPI_11_200_1000_4`
+* `knapPI_13_200_1000_4`
+* `knapPI_16_200_1000_4`
+
+#Results
+
+## Tweak 10
+### 5 runs per treatment
+
+First let's load up the data with just 5 runs per treatment.
+
+```{r}
+data_5_runs <- read.csv("../data-5-1000.txt", sep="")
+
+data_5_runs$Non_negative_score = ifelse(data_5_runs$Score<0, 0, data_5_runs$Score)
+
+plot(data_5_runs$Non_negative_score ~ data_5_runs$Search_method,
+     xlab="Searcher", ylab="Score")
+```
+
+It appears that our restart-penalized out performs our other algorithms (restart is the not labeled on on the left, randomly choosen is on the far right)
+I think that more runs would make sense though.
+
+
+
+### 50 runs per treatment
+
+
+```{r}
+data_50_runs <- read.csv("../data-50-10000.txt", sep="")
+
+```
+
+
+
+```{r}
+data_50_runs$Non_negative_score = ifelse(data_50_runs$Score<0, 0, data_50_runs$Score)
+
+plot(data_50_runs$Non_negative_score ~ data_50_runs$Search_method,
+     xlab="Searcher", ylab="Score")
+```
+
+It looks like our cliff_score and random restart hill climber did not do well relative to completely random, but there is some hope with our restart-penalized.
+
+```{r}
+pairwise.wilcox.test(data_50_runs$Non_negative_score, data_50_runs$Search_method)
+```
+
+We are getting pretty high p-values. I think that this might be because we are switching a lot of values with our tweak function. 
+
+### How do things change by problem?
+
+Let's load the `ggplot2` package
+
+```{r}
+library("ggplot2")
+```
+
+
+
+```{r}
+twenty_item_problems = subset(data_50_runs, Problem=="knapPI_11_20_1000_4" | Problem=="knapPI_13_20_1000_4" | Problem=="knapPI_16_20_1000_4")
+
+ggplot(twenty_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Problem)
+
+two_hundren_item_problems = subset(data_50_runs, Problem=="knapPI_11_200_1000_4" | Problem=="knapPI_13_200_1000_4" | Problem=="knapPI_16_200_1000_4")
+
+ggplot(two_hundren_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Problem)
+```
+
+There was not much difference between our algorithms, although interestingly our random restart and random answer hill climber were very similar. This could suggest that we are being too random (too often?) with our random start
+
+### How do things change by maximum number of evals?
+
+```{r}
+ggplot(twenty_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Max_evals)
+
+ggplot(two_hundren_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Max_evals)
+```
+
+
+```{r}
+ggplot(twenty_item_problems, aes(factor(Max_evals), Non_negative_score)) + geom_boxplot() + facet_grid(Problem ~ Search_method)
+
+ggplot(two_hundren_item_problems, aes(factor(Max_evals), Non_negative_score)) + geom_boxplot() + facet_grid(Problem ~ Search_method)
+```
+
+
+```{r}
+pairwise.wilcox.test(data_50_runs$Non_negative_score, interaction(data_50_runs$Search_method, data_50_runs$Problem, data_50_runs$Max_evals))
+```
+
+Similar results as above. This gives further proof that our random restart could be too acting too similar to our random answer. Adding in the penalized score seemed to decrease the amount of lower scores we got. 
+
+```{r}
+library("rpart")
+
+rp <- rpart(Non_negative_score ~ Search_method + Problem + Max_evals, data=data_50_runs)
+rp
+plot(rp)
+text(rp, use.n = TRUE)
+```
+
+
+## Tweak 5
+### 5 runs per treatment
+
+First let's load up the data with just 5 runs per treatment.
+
+```{r}
+data_5_runs_tweak6 <- read.csv("../data-5-1000-tweak6.txt", sep="")
+
+data_5_runs_tweak6$Non_negative_score = ifelse(data_5_runs_tweak6$Score<0, 0, data_5_runs_tweak6$Score)
+
+plot(data_5_runs_tweak6$Non_negative_score ~ data_5_runs_tweak6$Search_method,
+     xlab="Searcher", ylab="Score")
+```
+
+
+
+```{r}
+pairwise.wilcox.test(data_5_runs_tweak6$Score, data_5_runs_tweak6$Search_method)
+```
+
+Hmm not getting significant p-values, but more data might help. It is hinting that our algorithm has improved by halfing the number of items tweaked.
+### 50 runs per treatment
+
+
+
+```{r}
+data_50_runs_tweak6 <- read.csv("../data-50-10000-tweak6.txt", sep="")
+
+```
+
+
+
+```{r}
+data_50_runs_tweak6$Non_negative_score = ifelse(data_50_runs_tweak6$Score<0, 0, data_50_runs_tweak6$Score)
+
+plot(data_50_runs_tweak6$Non_negative_score ~ data_50_runs_tweak6$Search_method,
+     xlab="Searcher", ylab="Score")
+```
+
+The general picture looks similar to the earlier situation, with the middle boxplot definitely looking better than the other two, but the situation between the leftmost and rightmost plots not being entirely clear. So let's run a test.
+
+```{r}
+pairwise.wilcox.test(data_50_runs_tweak6$Non_negative_score, data_50_runs_tweak6$Search_method)
+```
+
+Still not significant, but it is better! This is more proof that our tweak function was incorrect. The restart-penalized also does better. Much better than just restart which did not do noticibly better than our regular hill climber. This tell us that penalizing is much better than randomizing hill_climber. 
+
+### How do things change by problem?
+
+Let's load the `ggplot2` package
+
+```{r}
+library("ggplot2")
+```
+
+```{r}
+twenty_item_problems = subset(data_50_runs_tweak6, Problem=="knapPI_11_20_1000_4" | Problem=="knapPI_13_20_1000_4" | Problem=="knapPI_16_20_1000_4")
+
+ggplot(twenty_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Problem)
+
+two_hundren_item_problems = subset(data_50_runs_tweak6, Problem=="knapPI_11_200_1000_4" | Problem=="knapPI_13_200_1000_4" | Problem=="knapPI_16_200_1000_4")
+
+ggplot(two_hundren_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Problem)
+```
+
+These graphs also look better, although still not really great. Our random restart still looks pretty similar to the completely random choice. This could mean that it is still too random. 
+
+### How do things change by maximum number of evals?
+
+```{r}
+ggplot(twenty_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Max_evals)
+
+ggplot(two_hundren_item_problems, aes(Search_method, Non_negative_score)) + geom_boxplot() + facet_grid(. ~ Max_evals)
+```
+
+
+```{r}
+ggplot(twenty_item_problems, aes(factor(Max_evals), Non_negative_score)) + geom_boxplot() + facet_grid(Problem ~ Search_method)
+
+ggplot(two_hundren_item_problems, aes(factor(Max_evals), Non_negative_score)) + geom_boxplot() + facet_grid(Problem ~ Search_method)
+```
+
+
+```{r}
+pairwise.wilcox.test(data_50_runs_tweak6$Non_negative_score, interaction(data_50_runs_tweak6$Search_method, data_50_runs_tweak6$Problem, data_50_runs_tweak6$Max_evals))
+```
+
+It appears that our purely random restart is doing worse than our regular hill climber. This is probably because it restarts too early. 
+
+```{r}
+library("rpart")
+
+rp <- rpart(Non_negative_score ~ Search_method + Problem + Max_evals, data=data_50_runs_tweak6)
+rp
+plot(rp)
+text(rp, use.n = TRUE)
+```
+
+
+#Conclusion
+We have seen a slight improvement when going from tweaking 10 things to tweaking 5. Modifying too many things wasn't keeping the items with good ratios. This made it look more at sets of items rather then individual items which ended up hurting us in the end. 
+Looking through the statisitcs we think that our restarts are not allowing for enough tweaks before restarting, as well as the tweak function is changing too many of the items for it to be fully effective. In future runs of this we would like to try changing up those numbers a bit more to allow it to climb more efficiently. This meaning only changing on average only one item per iteration, and restarting after more tweaks.
+
