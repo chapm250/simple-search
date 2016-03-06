@@ -1,4 +1,4 @@
-(ns simple-search.core
+(ns simple-search.core_tweak
   (:use simple-search.knapsack-examples.knapPI_11_20_1000
         simple-search.knapsack-examples.knapPI_13_20_1000
         simple-search.knapsack-examples.knapPI_16_20_1000))
@@ -46,11 +46,26 @@
     0
     (:total-value answer)))
 
+(defn penalized-score
+  "Takes the total-weight of the given answer unless it's over capacity,
+   in which case we return the negative of the total weight."
+  [answer]
+  (if (> (:total-weight answer)
+         (:capacity (:instance answer)))
+    (- (:total-weight answer))
+    (:total-value answer)))
+
 (defn add-score
   "Computes the score of an answer and inserts a new :score field
   to the given answer, returning the augmented answer."
   [answer]
   (assoc answer :score (score answer)))
+
+(defn add-penalized-score
+  "Computes the score of an answer and inserts a new :score field
+  to the given answer, returning the augmented answer."
+  [answer]
+  (assoc answer :score (penalized-score answer)))
 
 (defn random-search
   [instance max-tries]
@@ -68,6 +83,15 @@
      :total-weight (reduce + (map :weight included))
      :total-value (reduce + (map :value included))}))
 
+;; (defn tweak-choice
+;;   [choice x]
+;;   (let [conchoice (into [] choice)
+;;         pos (rand-int (count conchoice))]
+;;     (if (> x 0)
+;;       (tweak-choice (assoc conchoice pos (- 1 (conchoice pos)) (dec x)))
+;;       (seq choice)
+;;       )))
+
 (defn tweak-choice
   [choice x]
   (let [conchoice (into [] choice)]
@@ -76,30 +100,71 @@
       (seq choice)
       )))
 
-
-(defn hill-climb
-  [winner max-tries max-tries-perhill instance]
+(defn hill-climb-restart
+  [instance max-tries]
+  (let [winner (add-score (random-answer instance))
+        num-items (count (:choices instance))]
   (loop [num-tries 0
          current-best winner
          previous-hill winner]
     (if (>= num-tries max-tries)
       (max-key :score current-best previous-hill)
-      (if(=(mod num-tries max-tries-perhill) 0)
+      (if(=(mod num-tries 100) 0)
 
-        (let [tweaked-choices (tweak-choice (:choices current-best)  10)
+        (let [tweaked-choices (tweak-choice (:choices current-best)  (/ num-items 10))
               new-answer (find-answer tweaked-choices instance)
               scored-new-answer (add-score new-answer)]
           (recur (inc num-tries)
                  (add-score (random-answer instance))
                  (max-key :score current-best previous-hill)))
 
-        (let [tweaked-choices (tweak-choice (:choices current-best)  10)
+        (let [tweaked-choices (tweak-choice (:choices current-best)  (/ num-items 10))
               new-answer (find-answer tweaked-choices instance)
               scored-new-answer (add-score new-answer)]
           (recur (inc num-tries)
                  (max-key :score current-best scored-new-answer)
                  previous-hill))
-        ))))
+        )))))
 
 
-(hill-climb (add-score (random-answer knapPI_11_20_1000_29)) 20000 2000 knapPI_11_20_1000_29)
+(defn hill-climb-restart-penalized
+  [instance max-tries]
+  (let [winner (add-penalized-score (random-answer instance))
+        num-items (count (:choices instance))]
+  (loop [num-tries 0
+         current-best winner
+         previous-hill winner]
+    (if (>= num-tries max-tries)
+      (max-key :score current-best previous-hill)
+      (if(=(mod num-tries 100) 0)
+
+        (let [tweaked-choices (tweak-choice (:choices current-best)  (/ num-items 10))
+              new-answer (find-answer tweaked-choices instance)
+              scored-new-answer (add-penalized-score new-answer)]
+          (recur (inc num-tries)
+                 (add-penalized-score (random-answer instance))
+                 (max-key :score current-best previous-hill)))
+
+        (let [tweaked-choices (tweak-choice (:choices current-best)  (/ num-items 10))
+              new-answer (find-answer tweaked-choices instance)
+              scored-new-answer (add-penalized-score new-answer)]
+          (recur (inc num-tries)
+                 (max-key :score current-best scored-new-answer)
+                 previous-hill))
+        )))))
+
+(defn hill-climb
+  [instance max-tries]
+  (let [winner (add-score (random-answer instance))
+        num-items (count (:choices instance))]
+  (loop [num-tries 0
+         current-best winner]
+    (if (>= num-tries max-tries)
+      current-best
+      (let [tweaked-choices (tweak-choice (:choices current-best)  (/ num-items 10))
+            new-answer (find-answer tweaked-choices instance)
+            scored-new-answer (add-score new-answer)]
+        (recur (inc num-tries)
+               (max-key :score current-best scored-new-answer)))
+      ))))
+
